@@ -8,53 +8,125 @@ export const SITE_TAGLINE =
   "Porównywarka usług cyfrowych";
 
 export const SITE_DESCRIPTION =
-  "Porównuj hosting, VPS, domeny, chmurę i inne usługi cyfrowe na podstawie zweryfikowanych danych, cen i transparentnej metodologii Narzivo.";
+  "Porównuj usługi cyfrowe na podstawie cen, parametrów, zweryfikowanych danych i transparentnej metodologii.";
+
+function normalizeSiteUrl(
+  value: string,
+) {
+  const trimmed =
+    value
+      .trim()
+      .replace(
+        /\/+$/,
+        "",
+      );
+
+  if (
+    trimmed.startsWith(
+      "http://",
+    ) ||
+    trimmed.startsWith(
+      "https://",
+    )
+  ) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
+function isLocalHostname(
+  hostname: string,
+) {
+  const normalized =
+    hostname
+      .trim()
+      .toLowerCase();
+
+  return (
+    normalized ===
+      "localhost" ||
+    normalized ===
+      "127.0.0.1" ||
+    normalized ===
+      "::1" ||
+    normalized.endsWith(
+      ".local",
+    )
+  );
+}
 
 export function getSiteUrl() {
-  const configured =
+  const configuredUrl =
     process.env
       .NEXT_PUBLIC_SITE_URL
       ?.trim();
 
-  if (!configured) {
-    if (
-      process.env.NODE_ENV ===
-      "production"
-    ) {
-      throw new Error(
-        "Brak NEXT_PUBLIC_SITE_URL w środowisku produkcyjnym.",
-      );
-    }
+  const vercelProductionUrl =
+    process.env
+      .VERCEL_PROJECT_PRODUCTION_URL
+      ?.trim() ||
+    process.env
+      .NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL
+      ?.trim();
 
-    return new URL(
-      FALLBACK_SITE_URL,
+  const rawUrl =
+    configuredUrl ||
+    vercelProductionUrl ||
+    FALLBACK_SITE_URL;
+
+  const normalized =
+    normalizeSiteUrl(
+      rawUrl,
+    );
+
+  let url: URL;
+
+  try {
+    url =
+      new URL(
+        normalized,
+      );
+  } catch {
+    throw new Error(
+      "Adres strony ma nieprawidłowy format.",
     );
   }
 
-  const normalized =
-    configured.endsWith("/")
-      ? configured
-      : `${configured}/`;
+  const local =
+    isLocalHostname(
+      url.hostname,
+    );
 
-  return new URL(
-    normalized,
-  );
+  if (
+    process.env.NODE_ENV ===
+      "production" &&
+    !local &&
+    url.protocol !==
+      "https:"
+  ) {
+    throw new Error(
+      "Publiczny adres strony produkcyjnej musi używać HTTPS.",
+    );
+  }
+
+  return url;
 }
 
 export function absoluteUrl(
   path = "/",
 ) {
+  const normalizedPath =
+    path.startsWith("/")
+      ? path
+      : `/${path}`;
+
   return new URL(
-    path,
+    normalizedPath,
     getSiteUrl(),
   ).toString();
 }
 
-/*
- * Zachowujemy również ten eksport
- * dla kompatybilności z pozostałymi
- * plikami projektu.
- */
 export const site = {
   name:
     SITE_NAME,
