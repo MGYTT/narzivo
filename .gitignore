@@ -1,0 +1,42 @@
+# dependencies
+/node_modules/
+
+# Next.js
+/.next/
+/out/
+
+# production
+/build/
+/dist/
+
+# local/generated
+/generated/prisma/
+*.tsbuildinfo
+next-env.d.ts
+
+# environment variables — NIGDY do GitHuba
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel/
+
+# tests / coverage
+/coverage/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# certificates / keys
+*.pem
+*.key

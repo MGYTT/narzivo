@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["narzivo"]
+}
+
+enum BillingPeriod {
+  ONE_TIME
+  MONTH
+  YEAR
+  CUSTOM
+
+  @@schema("narzivo")
+}
+
+enum AffiliateStatus {
+  PENDING
+  ACTIVE
+  PAUSED
+  REJECTED
+
+  @@schema("narzivo")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String
+  icon        String?
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  offers         Offer[]
+  ratingCriteria RatingCriterion[]
+
+  @@index([isPublished, sortOrder])
+  @@schema("narzivo")
+}
+
+model Provider {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  websiteUrl  String
+  logoUrl     String?
+  description String
+  countryCode String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  offers            Offer[]
+  affiliatePrograms AffiliateProgram[]
+
+  @@schema("narzivo")
+}
+
+model AffiliateProgram {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  network          String
+  programName      String
+  status           AffiliateStatus @default(PENDING)
+  termsUrl         String?
+  cookieDays       Int?
+  commissionNote   String?
+  accountReference String?
+  lastVerifiedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId, status])
+  @@schema("narzivo")
+}
+
+model Offer {
+  id          String @id @default(cuid())
+  name        String
+  slug        String @unique
+  summary     String
+  description String
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  priceAmount  Decimal? @db.Decimal(12, 2)
+  regularPrice Decimal? @db.Decimal(12, 2)
+
+  currency      String        @default("PLN")
+  billingPeriod BillingPeriod @default(MONTH)
+  billingLabel  String?
+
+  promoCode    String?
+  affiliateUrl String?
+  sourceUrl    String
+
+  features Json
+
+  useCases String[]
+  pros     String[]
+  cons     String[]
+
+  editorScore      Decimal? @db.Decimal(3, 1)
+  methodologyNotes String?
+
+  isFeatured  Boolean @default(false)
+  isPublished Boolean @default(false)
+
+  validFrom DateTime?
+  validTo   DateTime?
+
+  lastVerifiedAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clicks       AffiliateClick[]
+  priceHistory OfferPriceHistory[]
+  ratings      OfferRating[]
+
+  @@index([categoryId, isPublished])
+  @@index([providerId, isPublished])
+  @@index([isFeatured, isPublished])
+  @@schema("narzivo")
+}
+
+model OfferPriceHistory {
+  id      String @id @default(cuid())
+  offerId String
+  offer   Offer  @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  priceAmount  Decimal? @db.Decimal(12, 2)
+  regularPrice Decimal? @db.Decimal(12, 2)
+
+  currency String
+
+  capturedAt DateTime @default(now())
+
+  @@index([offerId, capturedAt])
+  @@schema("narzivo")
+}
+
+model AffiliateClick {
+  id      String @id @default(cuid())
+  offerId String
+  offer   Offer  @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  referrer      String?
+  userAgentHash String?
+  ipHash        String?
+
+  createdAt DateTime @default(now())
+
+  @@index([offerId, createdAt])
+  @@index([createdAt])
+  @@index([ipHash, createdAt])
+  @@schema("narzivo")
+}
+
+model RatingCriterion {
+  id String @id @default(cuid())
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  key         String
+  name        String
+  description String?
+
+  weight      Decimal @default(1) @db.Decimal(5, 2)
+  sortOrder   Int     @default(0)
+  isPublished Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ratings OfferRating[]
+
+  @@unique([categoryId, key])
+  @@index([categoryId, isPublished, sortOrder])
+  @@schema("narzivo")
+}
+
+model OfferRating {
+  id String @id @default(cuid())
+
+  offerId String
+  offer   Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  criterionId String
+  criterion   RatingCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  score Decimal @db.Decimal(3, 1)
+
+  note      String?
+  sourceUrl String?
+
+  lastVerifiedAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([offerId, criterionId])
+  @@index([offerId])
+  @@index([criterionId])
+  @@schema("narzivo")
+}
