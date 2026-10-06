@@ -24,6 +24,22 @@ import {
   parseWarsawDateTimeInput,
 } from "@/lib/warsaw-datetime";
 
+import {
+  autoRateOfferById,
+} from "@/lib/auto-rating";
+
+import {
+  getOfferReadinessById,
+} from "@/lib/offer-readiness";
+
+import {
+  generateAffiliateUrl,
+} from "@/lib/affiliate-url";
+
+import {
+  mergeHostingFeatures,
+} from "@/lib/hosting-features";
+
 const BILLING_PERIODS = [
   "ONE_TIME",
   "MONTH",
@@ -71,7 +87,9 @@ function numberValue(
   }
 
   const result =
-    Number(raw);
+    Number(
+      raw,
+    );
 
   if (
     !Number.isFinite(
@@ -94,12 +112,16 @@ function linesValue(
   return stringValue(
     value,
   )
-    .split(/\r?\n/)
+    .split(
+      /\r?\n/,
+    )
     .map(
       (item) =>
         item.trim(),
     )
-    .filter(Boolean);
+    .filter(
+      Boolean,
+    );
 }
 
 function normalizeSlug(
@@ -175,17 +197,6 @@ function httpUrl(
   return url.toString();
 }
 
-/*
- * Zwraca null dla pustego pola.
- *
- * Jest to celowe:
- * null oznacza:
- * "użytkownik nie przesłał parametrów".
- *
- * Dzięki temu podczas edycji nie
- * nadpisujemy istniejących danych
- * pustym obiektem.
- */
 function featuresValue(
   value:
     FormDataEntryValue
@@ -202,7 +213,8 @@ function featuresValue(
     return null;
   }
 
-  let parsed: unknown;
+  let parsed:
+    unknown;
 
   try {
     parsed =
@@ -232,29 +244,26 @@ function featuresValue(
 }
 
 function isEmptyJsonObject(
-  value: unknown,
+  value:
+    unknown,
 ) {
-  if (
-    !value ||
-    typeof value !==
-      "object" ||
-    Array.isArray(
-      value,
-    )
-  ) {
-    return false;
-  }
-
-  return (
-    Object.keys(
-      value,
-    ).length ===
-    0
+  return Boolean(
+    value &&
+      typeof value ===
+        "object" &&
+      !Array.isArray(
+        value,
+      ) &&
+      Object.keys(
+        value,
+      ).length ===
+        0,
   );
 }
 
 function jsonObjectValue(
-  value: unknown,
+  value:
+    unknown,
 ): Prisma.InputJsonValue {
   if (
     value &&
@@ -271,7 +280,8 @@ function jsonObjectValue(
 }
 
 function optionalDate(
-  value: string,
+  value:
+    string,
 ) {
   return value
     ? parseWarsawDateTimeInput(
@@ -324,8 +334,214 @@ function revalidateOfferPages() {
   );
 }
 
+async function autoRateAfterSave(
+  offerId: string,
+  categorySlug: string,
+) {
+  if (
+    categorySlug !==
+    "hosting-www"
+  ) {
+    return false;
+  }
+
+  try {
+    await autoRateOfferById(
+      offerId,
+    );
+
+    return true;
+  } catch (
+    error
+  ) {
+    console.error(
+      "Automatyczny scoring nie powiódł się:",
+      {
+        offerId,
+        error,
+      },
+    );
+
+    return false;
+  }
+}
+
+async function uniqueCloneSlug(
+  sourceSlug:
+    string,
+) {
+  let index =
+    1;
+
+  while (
+    index <
+    1000
+  ) {
+    const suffix =
+      index === 1
+        ? "kopia"
+        : `kopia-${index}`;
+
+    const slug =
+      `${sourceSlug}-${suffix}`;
+
+    const exists =
+      await prisma.offer.findUnique({
+        where: {
+          slug,
+        },
+
+        select: {
+          id:
+            true,
+        },
+      });
+
+    if (!exists) {
+      return slug;
+    }
+
+    index +=
+      1;
+  }
+
+  throw new Error(
+    "Nie udało się wygenerować slugu kopii.",
+  );
+}
+
+export async function cloneOffer(
+  formData:
+    FormData,
+) {
+  await requireAdmin();
+
+  const id =
+    stringValue(
+      formData.get(
+        "id",
+      ),
+    );
+
+  if (!id) {
+    redirect(
+      "/admin/oferty",
+    );
+  }
+
+  const source =
+    await prisma.offer.findUnique({
+      where: {
+        id,
+      },
+    });
+
+  if (!source) {
+    redirect(
+      "/admin/oferty",
+    );
+  }
+
+  const slug =
+    await uniqueCloneSlug(
+      source.slug,
+    );
+
+  const features =
+    JSON.parse(
+      JSON.stringify(
+        source.features,
+      ),
+    ) as Prisma.InputJsonValue;
+
+  const created =
+    await prisma.offer.create({
+      data: {
+        name:
+          `KOPIA — ${source.name}`,
+
+        slug,
+
+        summary:
+          source.summary,
+
+        description:
+          source.description,
+
+        categoryId:
+          source.categoryId,
+
+        providerId:
+          source.providerId,
+
+        priceAmount:
+          source.priceAmount,
+
+        regularPrice:
+          source.regularPrice,
+
+        currency:
+          source.currency,
+
+        billingPeriod:
+          source.billingPeriod,
+
+        billingLabel:
+          source.billingLabel,
+
+        promoCode:
+          source.promoCode,
+
+        affiliateUrl:
+          source.affiliateUrl,
+
+        sourceUrl:
+          source.sourceUrl,
+
+        features,
+
+        useCases:
+          source.useCases,
+
+        pros:
+          source.pros,
+
+        cons:
+          source.cons,
+
+        methodologyNotes:
+          source.methodologyNotes,
+
+        editorScore:
+          null,
+
+        isFeatured:
+          false,
+
+        isPublished:
+          false,
+
+        validFrom:
+          null,
+
+        validTo:
+          null,
+
+        lastVerifiedAt:
+          source.lastVerifiedAt,
+      },
+    });
+
+  revalidateOfferPages();
+
+  redirect(
+    `/admin/oferty?edit=${created.id}&cloned=1`,
+  );
+}
+
 export async function saveOffer(
-  formData: FormData,
+  formData:
+    FormData,
 ) {
   await requireAdmin();
 
@@ -349,7 +565,8 @@ export async function saveOffer(
         formData.get(
           "slug",
         ),
-      ) || name,
+      ) ||
+        name,
     );
 
   const summary =
@@ -486,6 +703,13 @@ export async function saveOffer(
       ),
     );
 
+  const requestedPublished =
+    boolValue(
+      formData.get(
+        "isPublished",
+      ),
+    );
+
   if (!name) {
     throw new Error(
       "Nazwa jest wymagana.",
@@ -539,7 +763,8 @@ export async function saveOffer(
   if (
     priceAmount !==
       null &&
-    priceAmount < 0
+    priceAmount <
+      0
   ) {
     throw new Error(
       "Cena nie może być ujemna.",
@@ -549,7 +774,8 @@ export async function saveOffer(
   if (
     regularPrice !==
       null &&
-    regularPrice < 0
+    regularPrice <
+      0
   ) {
     throw new Error(
       "Cena regularna nie może być ujemna.",
@@ -579,7 +805,11 @@ export async function saveOffer(
         },
 
         select: {
-          id: true,
+          id:
+            true,
+
+          slug:
+            true,
         },
       }),
 
@@ -590,7 +820,37 @@ export async function saveOffer(
         },
 
         select: {
-          id: true,
+          id:
+            true,
+
+          slug:
+            true,
+
+          affiliatePrograms: {
+            where: {
+              status:
+                "ACTIVE",
+            },
+
+            orderBy: [
+              {
+                lastVerifiedAt:
+                  "desc",
+              },
+              {
+                updatedAt:
+                  "desc",
+              },
+            ],
+
+            take:
+              1,
+
+            select: {
+              accountReference:
+                true,
+            },
+          },
         },
       }),
     ]);
@@ -613,13 +873,38 @@ export async function saveOffer(
       "Oficjalne źródło",
     );
 
+  const activeProgram =
+    provider
+      .affiliatePrograms[
+      0
+    ];
+
+  const generatedAffiliate =
+    affiliateRaw
+      ? null
+      : generateAffiliateUrl({
+          providerSlug:
+            provider.slug,
+
+          accountReference:
+            activeProgram?.accountReference,
+
+          sourceUrl,
+        });
+
   const affiliateUrl =
     affiliateRaw
       ? httpUrl(
           affiliateRaw,
           "Link afiliacyjny",
         )
-      : null;
+      : generatedAffiliate;
+
+  const affiliateWasGenerated =
+    !affiliateRaw &&
+    Boolean(
+      generatedAffiliate,
+    );
 
   const lastVerifiedAt =
     verifiedRaw
@@ -686,21 +971,19 @@ export async function saveOffer(
         ),
       ),
 
+    /*
+     * Publikację uruchomimy
+     * dopiero po kontroli
+     * readiness.
+     */
     isPublished:
-      boolValue(
-        formData.get(
-          "isPublished",
-        ),
-      ),
+      false,
 
     validFrom,
     validTo,
 
     lastVerifiedAt,
-  } satisfies Omit<
-    Prisma.OfferUncheckedUpdateInput,
-    "features"
-  >;
+  };
 
   let offerId =
     id;
@@ -713,7 +996,8 @@ export async function saveOffer(
         },
 
         select: {
-          id: true,
+          id:
+            true,
 
           categoryId:
             true,
@@ -727,12 +1011,6 @@ export async function saveOffer(
           currency:
             true,
 
-          /*
-           * Musimy pobrać istniejące
-           * parametry, aby chronić je
-           * przed przypadkowym
-           * wyzerowaniem.
-           */
           features:
             true,
         },
@@ -754,19 +1032,8 @@ export async function saveOffer(
         existingFeatures,
       );
 
-    /*
-     * Najważniejsze zabezpieczenie.
-     *
-     * Jeżeli formularz podczas
-     * edycji prześle pustą wartość
-     * albo {}, a w bazie istnieją
-     * już parametry, NIE kasujemy
-     * istniejących danych.
-     *
-     * Jawnie przesłany niepusty JSON
-     * normalnie aktualizuje features.
-     */
-    const features =
+    let features:
+      Prisma.InputJsonValue =
       (
         submittedFeatures ===
           null ||
@@ -779,12 +1046,21 @@ export async function saveOffer(
         : submittedFeatures ??
           {};
 
-    const updateData:
-      Prisma.OfferUncheckedUpdateInput =
-      {
-        ...commonData,
-        features,
-      };
+    /*
+     * Formularz Hostingu WWW
+     * automatycznie aktualizuje
+     * JSON.
+     */
+    if (
+      category.slug ===
+      "hosting-www"
+    ) {
+      features =
+        mergeHostingFeatures(
+          features,
+          formData,
+        );
+    }
 
     const priceChanged =
       (
@@ -821,18 +1097,15 @@ export async function saveOffer(
             id,
           },
 
-          data:
-            updateData,
+          data: {
+            ...commonData,
+            features,
+          },
         });
 
         if (
           categoryChanged
         ) {
-          /*
-           * Oceny starej kategorii
-           * nie mogą być przenoszone
-           * do nowej metodologii.
-           */
           await tx.offerRating.deleteMany({
             where: {
               offerId:
@@ -869,20 +1142,20 @@ export async function saveOffer(
       },
     );
   } else {
-    const features =
+    let features =
       submittedFeatures ??
       {};
 
-    const createData:
-      Prisma.OfferUncheckedCreateInput =
-      {
-        ...commonData,
-
-        features,
-
-        editorScore:
-          null,
-      };
+    if (
+      category.slug ===
+      "hosting-www"
+    ) {
+      features =
+        mergeHostingFeatures(
+          features,
+          formData,
+        );
+    }
 
     const created =
       await prisma.$transaction(
@@ -891,8 +1164,14 @@ export async function saveOffer(
         ) => {
           const result =
             await tx.offer.create({
-              data:
-                createData,
+              data: {
+                ...commonData,
+
+                features,
+
+                editorScore:
+                  null,
+              },
             });
 
           if (
@@ -921,15 +1200,95 @@ export async function saveOffer(
       created.id;
   }
 
+  const automaticallyRated =
+    await autoRateAfterSave(
+      offerId,
+      category.slug,
+    );
+
+  const readiness =
+    await getOfferReadinessById(
+      offerId,
+    );
+
+  const publishAllowed =
+    Boolean(
+      requestedPublished &&
+      readiness?.ready,
+    );
+
+  await prisma.offer.update({
+    where: {
+      id:
+        offerId,
+    },
+
+    data: {
+      isPublished:
+        publishAllowed,
+    },
+  });
+
   revalidateOfferPages();
 
+  const search =
+    new URLSearchParams();
+
+  search.set(
+    "edit",
+    offerId,
+  );
+
+  search.set(
+    "saved",
+    "1",
+  );
+
+  if (
+    automaticallyRated
+  ) {
+    search.set(
+      "rated",
+      "1",
+    );
+  }
+
+  if (
+    affiliateWasGenerated
+  ) {
+    search.set(
+      "affiliateGenerated",
+      "1",
+    );
+  }
+
+  if (readiness) {
+    search.set(
+      "readiness",
+      String(
+        readiness.score,
+      ),
+    );
+  }
+
+  if (
+    requestedPublished &&
+    !publishAllowed
+  ) {
+    search.set(
+      "publishBlocked",
+      "1",
+    );
+  }
+
   redirect(
-    `/admin/oferty?edit=${offerId}&saved=1`,
+    `/admin/oferty?${search.toString()}`,
   );
 }
 
 export async function deleteOffer(
-  formData: FormData,
+  formData:
+    FormData,
 ) {
   await requireAdmin();
 

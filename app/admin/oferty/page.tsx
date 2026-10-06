@@ -22,6 +22,10 @@ import {
 } from "@/lib/offer-validity";
 
 import {
+  getOfferReadinessByIds,
+} from "@/lib/offer-readiness";
+
+import {
   AdminNav,
 } from "@/components/AdminNav";
 
@@ -30,6 +34,7 @@ import {
 } from "@/components/ConfirmSubmitButton";
 
 import {
+  cloneOffer,
   deleteOffer,
   saveOffer,
 } from "./actions";
@@ -42,21 +47,34 @@ type SearchParams =
     edit?: string;
     saved?: string;
     deleted?: string;
+
+    cloned?: string;
+    rated?: string;
+
+    publishBlocked?:
+      string;
+
+    readiness?:
+      string;
   }>;
 
 function decimalInput(
-  value: unknown,
+  value:
+    unknown,
 ) {
   return value ===
       null ||
     value ===
       undefined
     ? ""
-    : String(value);
+    : String(
+        value,
+      );
 }
 
 function jsonInput(
-  value: unknown,
+  value:
+    unknown,
 ) {
   try {
     return JSON.stringify(
@@ -102,6 +120,39 @@ function StatusBadge({
   return (
     <span className="rounded-full bg-[#ecfdf3] px-2.5 py-1 text-xs font-semibold text-[#087443]">
       Aktywna
+    </span>
+  );
+}
+
+function ReadinessBadge({
+  score,
+}: {
+  score:
+    number;
+}) {
+  if (
+    score === 100
+  ) {
+    return (
+      <span className="rounded-full bg-[#ecfdf3] px-2.5 py-1 text-xs font-semibold text-[#087443]">
+        100% · Gotowa
+      </span>
+    );
+  }
+
+  if (
+    score >= 70
+  ) {
+    return (
+      <span className="rounded-full bg-[#fffaeb] px-2.5 py-1 text-xs font-semibold text-[#b54708]">
+        {score}%
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full bg-[#fef3f2] px-2.5 py-1 text-xs font-semibold text-[#b42318]">
+      {score}%
     </span>
   );
 }
@@ -172,21 +223,27 @@ export default async function OffersAdminPage({
               id:
                 query.edit,
             },
-
-            include: {
-              priceHistory: {
-                orderBy: {
-                  capturedAt:
-                    "desc",
-                },
-
-                take:
-                  10,
-              },
-            },
           })
         : null,
     ]);
+
+  const readinessMap =
+    await getOfferReadinessByIds(
+      offers.map(
+        (
+          offer,
+        ) =>
+          offer.id,
+      ),
+    );
+
+  const editingReadiness =
+    editing
+      ? readinessMap.get(
+          editing.id,
+        ) ??
+        null
+      : null;
 
   const hasSetup =
     categories.length >
@@ -212,10 +269,10 @@ export default async function OffersAdminPage({
                 </h1>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[#667085]">
-                  Publikacja, ceny,
-                  okres ważności,
-                  parametry i
-                  afiliacja.
+                  Dodawanie, klonowanie,
+                  automatyczna ocena,
+                  kontrola kompletności
+                  i publikacja ofert.
                 </p>
               </div>
 
@@ -233,6 +290,20 @@ export default async function OffersAdminPage({
               <div className="mt-6 rounded-[12px] border border-[#abefc6] bg-[#ecfdf3] px-4 py-3 text-sm font-medium text-[#087443]">
                 Oferta została
                 zapisana.
+
+                {query.rated
+                  ? " Ocena została automatycznie przeliczona."
+                  : ""}
+              </div>
+            ) : null}
+
+            {query.cloned ? (
+              <div className="mt-6 rounded-[12px] border border-[#d9d6fe] bg-[#f4f3ff] px-4 py-3 text-sm font-medium text-[#5048d8]">
+                Utworzono kopię
+                roboczą oferty.
+                Zmień nazwę, slug,
+                ceny i parametry,
+                a następnie zapisz.
               </div>
             ) : null}
 
@@ -243,7 +314,121 @@ export default async function OffersAdminPage({
               </div>
             ) : null}
 
+            {query.publishBlocked ? (
+              <div className="mt-6 rounded-[12px] border border-[#fedf89] bg-[#fffaeb] px-4 py-3 text-sm leading-6 text-[#b54708]">
+                Oferta została
+                zapisana jako szkic,
+                ale publikacja została
+                zablokowana, ponieważ
+                gotowość wynosi{" "}
+                <strong>
+                  {query.readiness ??
+                    "0"}
+                  %
+                </strong>
+                . Uzupełnij brakujące
+                elementy do 100%.
+              </div>
+            ) : null}
+
+            {editing &&
+            editingReadiness ? (
+              <section className="mt-7 overflow-hidden rounded-[18px] border border-[#e7e9ee] bg-white">
+                <div className="grid md:grid-cols-[220px_1fr]">
+                  <div className="border-b border-[#eceef2] bg-[#fafbfc] p-6 md:border-b-0 md:border-r">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#98a2b3]">
+                      Gotowość oferty
+                    </div>
+
+                    <div className="mt-3 text-[46px] font-[740] leading-none tracking-[-0.055em]">
+                      {
+                        editingReadiness.score
+                      }
+                      <span className="ml-1 text-lg font-medium text-[#98a2b3]">
+                        %
+                      </span>
+                    </div>
+
+                    <div className="mt-4">
+                      <ReadinessBadge
+                        score={
+                          editingReadiness.score
+                        }
+                      />
+                    </div>
+
+                    <div className="mt-4 text-xs leading-5 text-[#667085]">
+                      Afiliacja:{" "}
+                      <strong>
+                        {editingReadiness.affiliateActive
+                          ? "aktywna"
+                          : "brak"}
+                      </strong>
+                    </div>
+
+                    <p className="mt-3 text-[11px] leading-5 text-[#98a2b3]">
+                      Brak afiliacji nie
+                      obniża gotowości i
+                      nie wpływa na
+                      ranking.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 p-6 sm:grid-cols-2">
+                    {editingReadiness.checks.map(
+                      (
+                        check,
+                      ) => (
+                        <div
+                          key={
+                            check.key
+                          }
+                          className={[
+                            "rounded-[12px] border p-4",
+                            check.passed
+                              ? "border-[#d1fadf] bg-[#f6fef9]"
+                              : "border-[#fedf89] bg-[#fffcf5]",
+                          ].join(
+                            " ",
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="text-sm font-semibold text-[#344054]">
+                              {check.passed
+                                ? "✓ "
+                                : "○ "}
+
+                              {
+                                check.label
+                              }
+                            </div>
+
+                            <span className="text-[10px] font-semibold text-[#98a2b3]">
+                              {
+                                check.weight
+                              }
+                              %
+                            </span>
+                          </div>
+
+                          <p className="mt-2 text-[11px] leading-5 text-[#667085]">
+                            {
+                              check.detail
+                            }
+                          </p>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
             <form
+              key={
+                editing?.id ??
+                "new-offer"
+              }
               action={
                 saveOffer
               }
@@ -258,12 +443,46 @@ export default async function OffersAdminPage({
                 }
               />
 
-              <div className="border-b border-[#eceef2] px-6 py-5">
-                <h2 className="text-lg font-[680]">
-                  {editing
-                    ? "Edytuj ofertę"
-                    : "Nowa oferta"}
-                </h2>
+              <div className="flex items-center justify-between border-b border-[#eceef2] px-6 py-5">
+                <div>
+                  <h2 className="text-lg font-[680]">
+                    {editing
+                      ? "Edytuj ofertę"
+                      : "Nowa oferta"}
+                  </h2>
+
+                  {editing ? (
+                    <p className="mt-1 text-xs text-[#98a2b3]">
+                      Po zapisie ocena
+                      zostanie
+                      przeliczona
+                      automatycznie.
+                    </p>
+                  ) : null}
+                </div>
+
+                {editing ? (
+                  <form
+                    action={
+                      cloneOffer
+                    }
+                  >
+                    <input
+                      type="hidden"
+                      name="id"
+                      value={
+                        editing.id
+                      }
+                    />
+
+                    <button
+                      type="submit"
+                      className="btn btn-secondary"
+                    >
+                      Klonuj ofertę
+                    </button>
+                  </form>
+                ) : null}
               </div>
 
               <div className="grid gap-5 border-b border-[#eceef2] p-6 md:grid-cols-2">
@@ -317,7 +536,9 @@ export default async function OffersAdminPage({
                     </option>
 
                     {categories.map(
-                      (category) => (
+                      (
+                        category,
+                      ) => (
                         <option
                           key={
                             category.id
@@ -354,7 +575,9 @@ export default async function OffersAdminPage({
                     </option>
 
                     {providers.map(
-                      (provider) => (
+                      (
+                        provider,
+                      ) => (
                         <option
                           key={
                             provider.id
@@ -493,7 +716,7 @@ export default async function OffersAdminPage({
                     </select>
                   </label>
 
-                  <label>
+                  <label className="md:col-span-2">
                     <span className="label">
                       Etykieta okresu
                     </span>
@@ -508,7 +731,7 @@ export default async function OffersAdminPage({
                     />
                   </label>
 
-                  <label>
+                  <label className="md:col-span-2">
                     <span className="label">
                       Kod promocyjny
                     </span>
@@ -647,6 +870,13 @@ export default async function OffersAdminPage({
                     )}
                   />
                 </label>
+
+                <p className="mt-2 text-[11px] leading-5 text-[#98a2b3]">
+                  Podczas edycji pusty
+                  JSON nie usunie
+                  istniejących
+                  parametrów.
+                </p>
               </section>
 
               <section className="grid gap-5 border-b border-[#eceef2] p-6 lg:grid-cols-3">
@@ -706,8 +936,7 @@ export default async function OffersAdminPage({
                 <div className="grid gap-5 md:grid-cols-2">
                   <label>
                     <span className="label">
-                      Ostatnia weryfikacja
-                      *
+                      Ostatnia weryfikacja *
                     </span>
 
                     <input
@@ -734,7 +963,7 @@ export default async function OffersAdminPage({
                           ).toFixed(
                             1,
                           )}/10`
-                        : "Brak kompletnej oceny"}
+                        : "Zostanie policzona automatycznie"}
                     </div>
                   </div>
 
@@ -788,10 +1017,10 @@ export default async function OffersAdminPage({
                         Opublikowana
                       </div>
 
-                      <p className="mt-1 text-xs text-[#98a2b3]">
-                        `isPublished`
-                        nie omija okresu
-                        ważności.
+                      <p className="mt-1 text-xs leading-5 text-[#98a2b3]">
+                        Publikacja nastąpi
+                        tylko przy 100%
+                        gotowości.
                       </p>
                     </div>
                   </label>
@@ -809,7 +1038,9 @@ export default async function OffersAdminPage({
                 ) : null}
 
                 <button
-                  disabled={!hasSetup}
+                  disabled={
+                    !hasSetup
+                  }
                   type="submit"
                   className="btn btn-primary disabled:opacity-40"
                 >
@@ -825,9 +1056,18 @@ export default async function OffersAdminPage({
             </form>
 
             <section className="mt-10">
-              <h2 className="mb-5 text-xl font-[680]">
-                Wszystkie oferty
-              </h2>
+              <div className="mb-5">
+                <h2 className="text-xl font-[680]">
+                  Wszystkie oferty
+                </h2>
+
+                <p className="mt-1 text-xs text-[#98a2b3]">
+                  {
+                    offers.length
+                  }{" "}
+                  ofert
+                </p>
+              </div>
 
               <div className="table-wrap">
                 <table>
@@ -839,6 +1079,10 @@ export default async function OffersAdminPage({
 
                       <th>
                         Cena
+                      </th>
+
+                      <th>
+                        Gotowość
                       </th>
 
                       <th>
@@ -863,11 +1107,18 @@ export default async function OffersAdminPage({
 
                   <tbody>
                     {offers.map(
-                      (offer) => {
+                      (
+                        offer,
+                      ) => {
                         const windowStatus =
                           getOfferWindowStatus(
                             offer,
                             now,
+                          );
+
+                        const readiness =
+                          readinessMap.get(
+                            offer.id,
                           );
 
                         return (
@@ -892,6 +1143,17 @@ export default async function OffersAdminPage({
                                   offer.category.name
                                 }
                               </div>
+
+                              {offer.editorScore ? (
+                                <div className="mt-1 text-[10px] font-semibold text-[#635bff]">
+                                  {Number(
+                                    offer.editorScore,
+                                  ).toFixed(
+                                    1,
+                                  )}
+                                  /10
+                                </div>
+                              ) : null}
                             </td>
 
                             <td>
@@ -900,6 +1162,18 @@ export default async function OffersAdminPage({
                                 offer.currency,
                               ) ??
                                 "—"}
+                            </td>
+
+                            <td>
+                              {readiness ? (
+                                <ReadinessBadge
+                                  score={
+                                    readiness.score
+                                  }
+                                />
+                              ) : (
+                                "—"
+                              )}
                             </td>
 
                             <td>
@@ -944,13 +1218,34 @@ export default async function OffersAdminPage({
                             </td>
 
                             <td>
-                              <div className="flex justify-end gap-4">
+                              <div className="flex items-center justify-end gap-4 whitespace-nowrap">
                                 <Link
                                   href={`/admin/oferty?edit=${offer.id}`}
                                   className="text-sm font-semibold text-[#5048d8]"
                                 >
                                   Edytuj
                                 </Link>
+
+                                <form
+                                  action={
+                                    cloneOffer
+                                  }
+                                >
+                                  <input
+                                    type="hidden"
+                                    name="id"
+                                    value={
+                                      offer.id
+                                    }
+                                  />
+
+                                  <button
+                                    type="submit"
+                                    className="text-sm font-semibold text-[#475467]"
+                                  >
+                                    Klonuj
+                                  </button>
+                                </form>
 
                                 <form
                                   action={
