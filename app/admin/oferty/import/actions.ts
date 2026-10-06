@@ -20,6 +20,10 @@ import {
   autoRateOfferById,
 } from "@/lib/auto-rating";
 
+import {
+  generateOfferCopy,
+} from "@/lib/offer-copy";
+
 function stringValue(
   value:
     FormDataEntryValue
@@ -58,8 +62,7 @@ function normalizeSlug(
 }
 
 async function uniqueSlug(
-  base:
-    string,
+  base: string,
 ) {
   const normalized =
     normalizeSlug(
@@ -167,6 +170,39 @@ export async function importOfferFromUrl(
         category.slug,
     });
 
+  /*
+   * Treści powstają z danych
+   * technicznych, a nie poprzez
+   * kopiowanie marketingowego
+   * tekstu ze strony dostawcy.
+   */
+  const copy =
+    generateOfferCopy({
+      categorySlug:
+        category.slug,
+
+      offerName:
+        imported.name,
+
+      providerName:
+        imported.providerName,
+
+      priceAmount:
+        imported.priceAmount,
+
+      currency:
+        imported.currency,
+
+      billingPeriod:
+        imported.billingPeriod,
+
+      billingLabel:
+        imported.billingLabel,
+
+      features:
+        imported.features,
+    });
+
   const slug =
     await uniqueSlug(
       `${imported.providerSlug}-${imported.name}`,
@@ -186,10 +222,10 @@ export async function importOfferFromUrl(
               slug,
 
               summary:
-                imported.summary,
+                copy.summary,
 
               description:
-                imported.description,
+                copy.description,
 
               categoryId:
                 category.id,
@@ -224,25 +260,17 @@ export async function importOfferFromUrl(
               features:
                 imported.features,
 
-              /*
-               * Tych pól nie
-               * wymyślamy.
-               *
-               * Readiness pokaże,
-               * że wymagają
-               * uzupełnienia.
-               */
               useCases:
-                [],
+                copy.useCases,
 
               pros:
-                [],
+                copy.pros,
 
               cons:
-                [],
+                copy.cons,
 
               methodologyNotes:
-                "Szkic utworzony automatycznie z oficjalnej strony dostawcy. Przed publikacją zweryfikuj cenę, okres rozliczeniowy, warunki odnowienia i parametry techniczne.",
+                copy.methodologyNotes,
 
               editorScore:
                 null,
@@ -251,8 +279,8 @@ export async function importOfferFromUrl(
                 false,
 
               /*
-               * Import NIGDY
-               * nie publikuje.
+               * Import zawsze
+               * tworzy szkic.
                */
               isPublished:
                 false,
@@ -293,11 +321,6 @@ export async function importOfferFromUrl(
       },
     );
 
-  /*
-   * Ocena może zostać utworzona
-   * od razu, ale oferta nadal
-   * pozostaje szkicem.
-   */
   if (
     category.slug ===
     "hosting-www"
@@ -331,6 +354,11 @@ export async function importOfferFromUrl(
 
   params.set(
     "imported",
+    "1",
+  );
+
+  params.set(
+    "copyGenerated",
     "1",
   );
 

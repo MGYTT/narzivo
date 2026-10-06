@@ -20,6 +20,10 @@ import {
   autoRateOfferById,
 } from "@/lib/auto-rating";
 
+import {
+  generateOfferCopy,
+} from "@/lib/offer-copy";
+
 const MAX_VARIANTS =
   12;
 
@@ -271,6 +275,33 @@ export async function bulkImportOffers(
         continue;
       }
 
+      const copy =
+        generateOfferCopy({
+          categorySlug:
+            category.slug,
+
+          offerName:
+            imported.name,
+
+          providerName:
+            imported.providerName,
+
+          priceAmount:
+            imported.priceAmount,
+
+          currency:
+            imported.currency,
+
+          billingPeriod:
+            imported.billingPeriod,
+
+          billingLabel:
+            imported.billingLabel,
+
+          features:
+            imported.features,
+        });
+
       const slug =
         await uniqueSlug(
           `${imported.providerSlug}-${imported.name}`,
@@ -290,10 +321,10 @@ export async function bulkImportOffers(
                   slug,
 
                   summary:
-                    imported.summary,
+                    copy.summary,
 
                   description:
-                    imported.description,
+                    copy.description,
 
                   categoryId:
                     category.id,
@@ -329,16 +360,16 @@ export async function bulkImportOffers(
                     imported.features,
 
                   useCases:
-                    [],
+                    copy.useCases,
 
                   pros:
-                    [],
+                    copy.pros,
 
                   cons:
-                    [],
+                    copy.cons,
 
                   methodologyNotes:
-                    "Szkic utworzony przez masowy importer z oficjalnej strony dostawcy.",
+                    copy.methodologyNotes,
 
                   editorScore:
                     null,
@@ -397,7 +428,13 @@ export async function bulkImportOffers(
           error
         ) {
           console.error(
-            error,
+            "Automatyczny scoring:",
+            {
+              offerId:
+                offer.id,
+
+              error,
+            },
           );
         }
       }
@@ -408,7 +445,7 @@ export async function bulkImportOffers(
       error
     ) {
       console.error(
-        `Import ${variantName}:`,
+        `Import wariantu ${variantName}:`,
         error,
       );
 
