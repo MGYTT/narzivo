@@ -26,6 +26,14 @@ enum AffiliateStatus {
   @@schema("narzivo")
 }
 
+enum OfferChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@schema("narzivo")
+}
+
 model Category {
   id          String   @id @default(cuid())
   name        String
@@ -127,9 +135,10 @@ model Offer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  clicks       AffiliateClick[]
-  priceHistory OfferPriceHistory[]
-  ratings      OfferRating[]
+  clicks        AffiliateClick[]
+  priceHistory  OfferPriceHistory[]
+  ratings       OfferRating[]
+  changeReviews OfferChangeReview[]
 
   @@index([categoryId, isPublished])
   @@index([providerId, isPublished])
@@ -150,6 +159,31 @@ model OfferPriceHistory {
   capturedAt DateTime @default(now())
 
   @@index([offerId, capturedAt])
+  @@schema("narzivo")
+}
+
+model OfferChangeReview {
+  id String @id @default(cuid())
+
+  offerId String
+  offer   Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  status OfferChangeStatus @default(PENDING)
+
+  sourceUrl String
+
+  currentSnapshot  Json
+  detectedSnapshot Json
+  diff             Json
+
+  detectedAt DateTime @default(now())
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([offerId, status, detectedAt])
+  @@index([status, detectedAt])
   @@schema("narzivo")
 }
 

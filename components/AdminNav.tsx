@@ -67,10 +67,32 @@ const navigation:
         "/admin/oferty/import",
 
       label:
-        "Import ofert",
+        "Import z URL",
 
       description:
-        "Dodaj z URL",
+        "Pojedyncza oferta",
+    },
+
+    {
+      href:
+        "/admin/oferty/import/masowy",
+
+      label:
+        "Import masowy",
+
+      description:
+        "Wiele pakietów",
+    },
+
+    {
+      href:
+        "/admin/zmiany",
+
+      label:
+        "Zmiany",
+
+      description:
+        "Monitoring ofert",
     },
 
     {
@@ -118,26 +140,24 @@ export function AdminNav() {
       href ===
       "/admin"
     ) {
-      return (
-        pathname ===
-        "/admin"
-      );
+      return pathname ===
+        "/admin";
     }
 
-    /*
-     * Import jest podstroną
-     * /admin/oferty, więc zwykłe
-     * startsWith zaznaczałoby
-     * dwie pozycje jednocześnie.
-     */
     if (
       href ===
       "/admin/oferty"
     ) {
-      return (
-        pathname ===
-        "/admin/oferty"
-      );
+      return pathname ===
+        "/admin/oferty";
+    }
+
+    if (
+      href ===
+      "/admin/oferty/import"
+    ) {
+      return pathname ===
+        "/admin/oferty/import";
     }
 
     return pathname.startsWith(
@@ -153,12 +173,12 @@ export function AdminNav() {
             href="/admin"
             className="group flex items-center gap-3 rounded-[12px] p-1"
           >
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-[#111214] text-[14px] font-bold text-white transition-transform duration-200 group-hover:-rotate-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-[#111214] text-[14px] font-bold text-white">
               N
             </span>
 
-            <div className="min-w-0">
-              <div className="truncate text-[15px] font-[720] tracking-[-0.025em] text-[#101114]">
+            <div>
+              <div className="text-[15px] font-[720] text-[#101114]">
                 Narzivo
               </div>
 
@@ -192,51 +212,31 @@ export function AdminNav() {
 
                     active
                       ? "bg-[#f2f1ff] text-[#4f46d8]"
-                      : "text-[#475467] hover:bg-[#f7f7f8] hover:text-[#101114]",
+                      : "text-[#475467] hover:bg-[#f7f7f8]",
                   ].join(
                     " ",
                   )}
                 >
                   <span
                     className={[
-                      "h-2 w-2 shrink-0 rounded-full transition",
+                      "h-2 w-2 rounded-full",
 
                       active
                         ? "bg-[#635bff]"
-                        : "bg-[#d0d5dd] group-hover:bg-[#98a2b3]",
+                        : "bg-[#d0d5dd]",
                     ].join(
                       " ",
                     )}
                   />
 
-                  <div className="min-w-0">
-                    <div
-                      className={[
-                        "text-[13px]",
-
-                        active
-                          ? "font-[680]"
-                          : "font-medium",
-                      ].join(
-                        " ",
-                      )}
-                    >
+                  <div>
+                    <div className="text-[13px] font-medium">
                       {
                         item.label
                       }
                     </div>
 
-                    <div
-                      className={[
-                        "mt-0.5 truncate text-[10px]",
-
-                        active
-                          ? "text-[#7771d7]"
-                          : "text-[#98a2b3]",
-                      ].join(
-                        " ",
-                      )}
-                    >
+                    <div className="mt-0.5 text-[10px] text-[#98a2b3]">
                       {
                         item.description
                       }
@@ -252,13 +252,13 @@ export function AdminNav() {
           <Link
             href="/"
             target="_blank"
-            className="flex items-center justify-between rounded-[11px] px-3 py-2.5 text-[13px] font-medium text-[#475467] transition hover:bg-[#f7f7f8] hover:text-[#101114]"
+            className="flex items-center justify-between rounded-[11px] px-3 py-2.5 text-[13px] font-medium text-[#475467]"
           >
             <span>
               Otwórz Narzivo
             </span>
 
-            <span className="text-[#98a2b3]">
+            <span>
               ↗
             </span>
           </Link>
@@ -272,7 +272,7 @@ export function AdminNav() {
           >
             <button
               type="submit"
-              className="flex w-full items-center justify-between rounded-[11px] px-3 py-2.5 text-left text-[13px] font-medium text-[#667085] transition hover:bg-[#fff5f4] hover:text-[#b42318]"
+              className="flex w-full items-center justify-between rounded-[11px] px-3 py-2.5 text-left text-[13px] text-[#667085]"
             >
               <span>
                 Wyloguj się
@@ -284,12 +284,6 @@ export function AdminNav() {
             </button>
           </form>
         </div>
-      </div>
-
-      <div className="mt-3 px-3 text-[10px] leading-4 text-[#98a2b3]">
-        Oceny, ceny i publikacja mogą
-        wpływać bezpośrednio na publiczną
-        część Narzivo.
       </div>
     </aside>
   );
