@@ -175,18 +175,31 @@ function httpUrl(
   return url.toString();
 }
 
+/*
+ * Zwraca null dla pustego pola.
+ *
+ * Jest to celowe:
+ * null oznacza:
+ * "użytkownik nie przesłał parametrów".
+ *
+ * Dzięki temu podczas edycji nie
+ * nadpisujemy istniejących danych
+ * pustym obiektem.
+ */
 function featuresValue(
   value:
     FormDataEntryValue
     | null,
-): Prisma.InputJsonValue {
+):
+  | Prisma.InputJsonValue
+  | null {
   const raw =
     stringValue(
       value,
     );
 
   if (!raw) {
-    return {};
+    return null;
   }
 
   let parsed: unknown;
@@ -216,6 +229,45 @@ function featuresValue(
   }
 
   return parsed as Prisma.InputJsonValue;
+}
+
+function isEmptyJsonObject(
+  value: unknown,
+) {
+  if (
+    !value ||
+    typeof value !==
+      "object" ||
+    Array.isArray(
+      value,
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    Object.keys(
+      value,
+    ).length ===
+    0
+  );
+}
+
+function jsonObjectValue(
+  value: unknown,
+): Prisma.InputJsonValue {
+  if (
+    value &&
+    typeof value ===
+      "object" &&
+    !Array.isArray(
+      value,
+    )
+  ) {
+    return value as Prisma.InputJsonValue;
+  }
+
+  return {};
 }
 
 function optionalDate(
@@ -427,6 +479,13 @@ export async function saveOffer(
       ),
     );
 
+  const submittedFeatures =
+    featuresValue(
+      formData.get(
+        "features",
+      ),
+    );
+
   if (!name) {
     throw new Error(
       "Nazwa jest wymagana.",
@@ -569,13 +628,6 @@ export async function saveOffer(
         )
       : new Date();
 
-  const features =
-    featuresValue(
-      formData.get(
-        "features",
-      ),
-    );
-
   const commonData = {
     name,
     slug,
@@ -601,8 +653,6 @@ export async function saveOffer(
 
     affiliateUrl,
     sourceUrl,
-
-    features,
 
     useCases:
       linesValue(
@@ -647,7 +697,10 @@ export async function saveOffer(
     validTo,
 
     lastVerifiedAt,
-  } satisfies Prisma.OfferUncheckedUpdateInput;
+  } satisfies Omit<
+    Prisma.OfferUncheckedUpdateInput,
+    "features"
+  >;
 
   let offerId =
     id;
@@ -673,6 +726,15 @@ export async function saveOffer(
 
           currency:
             true,
+
+          /*
+           * Musimy pobrać istniejące
+           * parametry, aby chronić je
+           * przed przypadkowym
+           * wyzerowaniem.
+           */
+          features:
+            true,
         },
       });
 
@@ -681,6 +743,48 @@ export async function saveOffer(
         "Oferta nie istnieje.",
       );
     }
+
+    const existingFeatures =
+      jsonObjectValue(
+        before.features,
+      );
+
+    const hasExistingFeatures =
+      !isEmptyJsonObject(
+        existingFeatures,
+      );
+
+    /*
+     * Najważniejsze zabezpieczenie.
+     *
+     * Jeżeli formularz podczas
+     * edycji prześle pustą wartość
+     * albo {}, a w bazie istnieją
+     * już parametry, NIE kasujemy
+     * istniejących danych.
+     *
+     * Jawnie przesłany niepusty JSON
+     * normalnie aktualizuje features.
+     */
+    const features =
+      (
+        submittedFeatures ===
+          null ||
+        isEmptyJsonObject(
+          submittedFeatures,
+        )
+      ) &&
+      hasExistingFeatures
+        ? existingFeatures
+        : submittedFeatures ??
+          {};
+
+    const updateData:
+      Prisma.OfferUncheckedUpdateInput =
+      {
+        ...commonData,
+        features,
+      };
 
     const priceChanged =
       (
@@ -718,7 +822,7 @@ export async function saveOffer(
           },
 
           data:
-            commonData,
+            updateData,
         });
 
         if (
@@ -765,10 +869,16 @@ export async function saveOffer(
       },
     );
   } else {
+    const features =
+      submittedFeatures ??
+      {};
+
     const createData:
       Prisma.OfferUncheckedCreateInput =
       {
         ...commonData,
+
+        features,
 
         editorScore:
           null,
