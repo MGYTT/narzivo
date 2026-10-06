@@ -23,6 +23,11 @@ import {
 } from "@/lib/auto-rating";
 
 import {
+  autoRateVpsCategoryById,
+  autoRateVpsOfferById,
+} from "@/lib/auto-rating-vps";
+
+import {
   recomputeCategoryScores,
   recomputeOfferScore,
 } from "@/lib/rating";
@@ -52,7 +57,9 @@ function numberValue(
   }
 
   const parsed =
-    Number(raw);
+    Number(
+      raw,
+    );
 
   return Number.isFinite(
     parsed,
@@ -67,14 +74,18 @@ function boolValue(
     | null,
 ) {
   return (
-    value === "on" ||
-    value === "true" ||
-    value === "1"
+    value ===
+      "on" ||
+    value ===
+      "true" ||
+    value ===
+      "1"
   );
 }
 
 function normalizeKey(
-  value: string,
+  value:
+    string,
 ) {
   return value
     .trim()
@@ -101,9 +112,11 @@ function normalizeKey(
 }
 
 function assertHttpUrl(
-  value: string,
+  value:
+    string,
 ) {
-  let url: URL;
+  let url:
+    URL;
 
   try {
     url =
@@ -131,7 +144,8 @@ function assertHttpUrl(
 }
 
 function parseDate(
-  value: string,
+  value:
+    string,
 ) {
   const date =
     new Date(
@@ -152,10 +166,12 @@ function parseDate(
 }
 
 function errorMessage(
-  error: unknown,
+  error:
+    unknown,
 ) {
   if (
-    error instanceof Error
+    error instanceof
+      Error
   ) {
     return error.message;
   }
@@ -164,10 +180,13 @@ function errorMessage(
 }
 
 function ratingsUrl(
-  categoryId: string,
+  categoryId:
+    string,
+
   offerId:
     | string
     | null,
+
   params:
     Record<
       string,
@@ -234,12 +253,75 @@ function revalidateRatings() {
   );
 }
 
+async function categorySlug(
+  categoryId:
+    string,
+) {
+  const category =
+    await prisma.category.findUnique({
+      where: {
+        id:
+          categoryId,
+      },
+
+      select: {
+        slug:
+          true,
+      },
+    });
+
+  if (!category) {
+    throw new Error(
+      "Kategoria nie istnieje.",
+    );
+  }
+
+  return category.slug;
+}
+
+async function offerCategory(
+  offerId:
+    string,
+) {
+  const offer =
+    await prisma.offer.findUnique({
+      where: {
+        id:
+          offerId,
+      },
+
+      select: {
+        id:
+          true,
+
+        categoryId:
+          true,
+
+        category: {
+          select: {
+            slug:
+              true,
+          },
+        },
+      },
+    });
+
+  if (!offer) {
+    throw new Error(
+      "Oferta nie istnieje.",
+    );
+  }
+
+  return offer;
+}
+
 /* =========================================================
    AUTOMATIC RATING
 ========================================================= */
 
 export async function autoRateOffer(
-  formData: FormData,
+  formData:
+    FormData,
 ) {
   await requireAdmin();
 
@@ -266,18 +348,50 @@ export async function autoRateOffer(
     );
   }
 
-  let result:
-    Awaited<
-      ReturnType<
-        typeof autoRateOfferById
-      >
-    >;
+  let result: {
+    generated: number;
+    skippedManual: number;
+  };
 
   try {
-    result =
-      await autoRateOfferById(
+    const offer =
+      await offerCategory(
         offerId,
       );
+
+    if (
+      offer.categoryId !==
+      categoryId
+    ) {
+      throw new Error(
+        "Oferta nie należy do wybranej kategorii.",
+      );
+    }
+
+    switch (
+      offer.category.slug
+    ) {
+      case "hosting-www":
+        result =
+          await autoRateOfferById(
+            offerId,
+          );
+
+        break;
+
+      case "vps-cloud-server":
+        result =
+          await autoRateVpsOfferById(
+            offerId,
+          );
+
+        break;
+
+      default:
+        throw new Error(
+          `Automatyczny scoring nie jest jeszcze skonfigurowany dla kategorii „${offer.category.slug}”.`,
+        );
+    }
   } catch (
     error
   ) {
@@ -320,7 +434,8 @@ export async function autoRateOffer(
 }
 
 export async function autoRateCategory(
-  formData: FormData,
+  formData:
+    FormData,
 ) {
   await requireAdmin();
 
@@ -344,25 +459,50 @@ export async function autoRateCategory(
     );
   }
 
-  let result:
-    Awaited<
-      ReturnType<
-        typeof autoRateCategoryById
-      >
-    >;
+  let result: {
+    offers: number;
+    generated: number;
+    skippedManual: number;
+  };
 
   try {
-    result =
-      await autoRateCategoryById(
+    const slug =
+      await categorySlug(
         categoryId,
       );
+
+    switch (
+      slug
+    ) {
+      case "hosting-www":
+        result =
+          await autoRateCategoryById(
+            categoryId,
+          );
+
+        break;
+
+      case "vps-cloud-server":
+        result =
+          await autoRateVpsCategoryById(
+            categoryId,
+          );
+
+        break;
+
+      default:
+        throw new Error(
+          `Automatyczny scoring nie jest jeszcze skonfigurowany dla kategorii „${slug}”.`,
+        );
+    }
   } catch (
     error
   ) {
     redirect(
       ratingsUrl(
         categoryId,
-        offerId || null,
+        offerId ||
+          null,
         {
           autoError:
             errorMessage(
@@ -378,7 +518,8 @@ export async function autoRateCategory(
   redirect(
     ratingsUrl(
       categoryId,
-      offerId || null,
+      offerId ||
+        null,
       {
         autoCategory:
           "1",
@@ -407,7 +548,8 @@ export async function autoRateCategory(
 ========================================================= */
 
 export async function saveRatingCriterion(
-  formData: FormData,
+  formData:
+    FormData,
 ) {
   await requireAdmin();
 
@@ -493,8 +635,10 @@ export async function saveRatingCriterion(
 
   if (
     weight === null ||
-    weight <= 0 ||
-    weight > 100
+    weight <=
+      0 ||
+    weight >
+      100
   ) {
     throw new Error(
       "Waga musi być większa od 0 i nie większa niż 100.",
@@ -509,7 +653,8 @@ export async function saveRatingCriterion(
       },
 
       select: {
-        id: true,
+        id:
+          true,
       },
     });
 
@@ -527,7 +672,9 @@ export async function saveRatingCriterion(
         },
 
         select: {
-          id: true,
+          id:
+            true,
+
           categoryId:
             true,
         },
@@ -608,7 +755,8 @@ export async function saveRatingCriterion(
 }
 
 export async function deleteRatingCriterion(
-  formData: FormData,
+  formData:
+    FormData,
 ) {
   await requireAdmin();
 
@@ -632,7 +780,9 @@ export async function deleteRatingCriterion(
       },
 
       select: {
-        id: true,
+        id:
+          true,
+
         categoryId:
           true,
       },
@@ -669,7 +819,8 @@ export async function deleteRatingCriterion(
 ========================================================= */
 
 export async function saveOfferRating(
-  formData: FormData,
+  formData:
+    FormData,
 ) {
   await requireAdmin();
 
@@ -696,9 +847,12 @@ export async function saveOfferRating(
 
   /*
    * Ręczne zapisanie oceny usuwa
-   * znacznik AUTO. Od tej chwili
-   * automat traktuje ją jako
-   * redakcyjny override.
+   * znacznik AUTO.
+   *
+   * Dzięki temu zarówno automat
+   * Hosting WWW, jak i VPS/Cloud
+   * traktują ocenę jako ręczny
+   * override.
    */
   const note =
     stripAutomaticRatingPrefix(
@@ -737,8 +891,10 @@ export async function saveOfferRating(
 
   if (
     score === null ||
-    score < 0 ||
-    score > 10
+    score <
+      0 ||
+    score >
+      10
   ) {
     throw new Error(
       "Ocena musi mieścić się w zakresie 0–10.",
@@ -757,7 +913,9 @@ export async function saveOfferRating(
         },
 
         select: {
-          id: true,
+          id:
+            true,
+
           categoryId:
             true,
         },
@@ -770,7 +928,9 @@ export async function saveOfferRating(
         },
 
         select: {
-          id: true,
+          id:
+            true,
+
           categoryId:
             true,
         },
@@ -865,7 +1025,8 @@ export async function saveOfferRating(
 }
 
 export async function deleteOfferRating(
-  formData: FormData,
+  formData:
+    FormData,
 ) {
   await requireAdmin();
 
@@ -900,7 +1061,9 @@ export async function deleteOfferRating(
       },
 
       select: {
-        id: true,
+        id:
+          true,
+
         categoryId:
           true,
       },
