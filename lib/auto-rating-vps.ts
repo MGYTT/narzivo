@@ -29,14 +29,10 @@ const SUPPORTED_CRITERIA =
   ]);
 
 type FeatureMap =
-  Record<
-    string,
-    unknown
-  >;
+  Record<string, unknown>;
 
 type ScorableOffer = {
   id: string;
-
   name: string;
   summary: string;
   description: string;
@@ -59,7 +55,6 @@ type ScorableOffer = {
     | null;
 
   sourceUrl: string;
-
   features: unknown;
 
   useCases: string[];
@@ -197,8 +192,10 @@ function valueText(
 }
 
 function featureText(
-  features: FeatureMap,
-  ...keys: string[]
+  features:
+    FeatureMap,
+  ...keys:
+    string[]
 ) {
   for (
     const key of keys
@@ -239,6 +236,58 @@ function containsAny(
   );
 }
 
+function isOptionalPaid(
+  raw: string,
+) {
+  if (!raw) {
+    return false;
+  }
+
+  const text =
+    normalizeText(
+      raw,
+    );
+
+  return (
+    text.includes(
+      "opcjonal",
+    ) ||
+    text.includes(
+      "dodatkowo plat",
+    ) ||
+    text.includes(
+      "za doplat",
+    ) ||
+    text.includes(
+      "platny dodatkowo",
+    )
+  );
+}
+
+function explicitlyUnavailable(
+  raw: string,
+) {
+  if (!raw) {
+    return false;
+  }
+
+  const text =
+    normalizeText(
+      raw,
+    );
+
+  return [
+    "nie",
+    "brak",
+    "false",
+    "0",
+    "niedostepny",
+    "niedostepne",
+  ].includes(
+    text,
+  );
+}
+
 function offerCorpus(
   offer:
     ScorableOffer,
@@ -248,18 +297,13 @@ function offerCorpus(
   return normalizeText(
     [
       offer.name,
-
       offer.summary,
-
       offer.description,
-
       offer.billingLabel ??
         "",
-
       ...offer.useCases,
       ...offer.pros,
       ...offer.cons,
-
       JSON.stringify(
         features,
       ),
@@ -362,7 +406,8 @@ function parseCapacityGb(
 function featureEnabled(
   features:
     FeatureMap,
-  ...keys: string[]
+  ...keys:
+    string[]
 ) {
   const raw =
     featureText(
@@ -374,18 +419,8 @@ function featureEnabled(
     return false;
   }
 
-  const normalized =
-    normalizeText(
-      raw,
-    );
-
-  return ![
-    "nie",
-    "false",
-    "brak",
-    "0",
-  ].includes(
-    normalized,
+  return !explicitlyUnavailable(
+    raw,
   );
 }
 
@@ -405,7 +440,10 @@ function parseCpuCores(
   if (!raw) {
     return {
       raw: "",
-      cores: null,
+      cores:
+        null as
+          | number
+          | null,
     };
   }
 
@@ -441,7 +479,8 @@ function money(
 }
 
 function annualPrice(
-  amount: number,
+  amount:
+    number,
   billingPeriod:
     string,
 ) {
@@ -455,11 +494,7 @@ function annualPrice(
       );
 
     case "YEAR":
-      return amount;
-
     case "ONE_TIME":
-      return amount;
-
     default:
       return amount;
   }
@@ -574,10 +609,6 @@ function effectiveAnnualPrices(
       introAnnual;
   }
 
-  /*
-   * Średni koszt roczny
-   * w perspektywie 3 lat.
-   */
   const averageAnnual =
     (
       introAnnual +
@@ -587,9 +618,7 @@ function effectiveAnnualPrices(
 
   return {
     introAnnual,
-
     regularAnnual,
-
     averageAnnual,
 
     averageMonthly:
@@ -607,55 +636,64 @@ function monthlyCostScore(
     number,
 ) {
   if (
-    monthly <= 50
+    monthly <=
+    50
   ) {
     return 10;
   }
 
   if (
-    monthly <= 100
+    monthly <=
+    100
   ) {
     return 9.3;
   }
 
   if (
-    monthly <= 200
+    monthly <=
+    200
   ) {
     return 8.4;
   }
 
   if (
-    monthly <= 300
+    monthly <=
+    300
   ) {
     return 7.5;
   }
 
   if (
-    monthly <= 450
+    monthly <=
+    450
   ) {
     return 6.5;
   }
 
   if (
-    monthly <= 650
+    monthly <=
+    650
   ) {
     return 5.5;
   }
 
   if (
-    monthly <= 900
+    monthly <=
+    900
   ) {
     return 4.5;
   }
 
   if (
-    monthly <= 1200
+    monthly <=
+    1200
   ) {
     return 3.5;
   }
 
   if (
-    monthly <= 1600
+    monthly <=
+    1600
   ) {
     return 2.5;
   }
@@ -664,28 +702,33 @@ function monthlyCostScore(
 }
 
 function priceJumpPenalty(
-  ratio: number,
+  ratio:
+    number,
 ) {
   if (
-    ratio <= 1.25
+    ratio <=
+    1.25
   ) {
     return 0;
   }
 
   if (
-    ratio <= 2
+    ratio <=
+    2
   ) {
     return 0.2;
   }
 
   if (
-    ratio <= 3
+    ratio <=
+    3
   ) {
     return 0.5;
   }
 
   if (
-    ratio <= 5
+    ratio <=
+    5
   ) {
     return 0.9;
   }
@@ -706,7 +749,8 @@ function scorePriceValue(
 
   if (!prices) {
     return {
-      score: 5,
+      score:
+        5,
 
       note:
         "Brak wystarczających danych liczbowych o cenie. Przyznano neutralną ocenę 5/10.",
@@ -740,13 +784,6 @@ function scorePriceValue(
     ) /
       2;
 
-  /*
-   * Prosty wskaźnik zasobów
-   * do średniego kosztu miesięcznego.
-   *
-   * Nie bierze pod uwagę afiliacji,
-   * prowizji ani pozycji handlowej.
-   */
   const efficiency =
     prices.averageMonthly >
       0
@@ -761,22 +798,26 @@ function scorePriceValue(
     0;
 
   if (
-    efficiency >= 5
+    efficiency >=
+    5
   ) {
     valueAdjustment =
       1;
   } else if (
-    efficiency >= 3
+    efficiency >=
+    3
   ) {
     valueAdjustment =
       0.7;
   } else if (
-    efficiency >= 2
+    efficiency >=
+    2
   ) {
     valueAdjustment =
       0.4;
   } else if (
-    efficiency >= 1
+    efficiency >=
+    1
   ) {
     valueAdjustment =
       0.1;
@@ -788,26 +829,24 @@ function scorePriceValue(
       -0.3;
   }
 
-  const priceRatio =
+  const ratio =
     prices.introAnnual >
       0
       ? prices.regularAnnual /
         prices.introAnnual
       : 1;
 
-  const score =
-    roundScore(
-      monthlyCostScore(
-        prices.averageMonthly,
-      ) +
-        valueAdjustment -
-        priceJumpPenalty(
-          priceRatio,
-        ),
-    );
-
   return {
-    score,
+    score:
+      roundScore(
+        monthlyCostScore(
+          prices.averageMonthly,
+        ) +
+          valueAdjustment -
+          priceJumpPenalty(
+            ratio,
+          ),
+      ),
 
     note:
       `Cena pierwszego roku: ${money(
@@ -822,7 +861,7 @@ function scorePriceValue(
         prices.averageMonthly,
         offer.currency,
       )}. ` +
-      `Uwzględniono również relację zapisanych zasobów CPU/RAM do kosztu oraz ewentualny wzrost ceny po okresie promocyjnym.`,
+      "Uwzględniono relację zapisanych zasobów CPU/RAM do kosztu oraz wzrost ceny po okresie promocyjnym.",
   };
 }
 
@@ -836,37 +875,43 @@ function cpuScore(
     | null,
 ) {
   if (
-    cores === null
+    cores ===
+    null
   ) {
     return 5.5;
   }
 
   if (
-    cores >= 16
+    cores >=
+    16
   ) {
     return 10;
   }
 
   if (
-    cores >= 8
+    cores >=
+    8
   ) {
     return 9.2;
   }
 
   if (
-    cores >= 4
+    cores >=
+    4
   ) {
     return 8;
   }
 
   if (
-    cores >= 2
+    cores >=
+    2
   ) {
     return 6.5;
   }
 
   if (
-    cores >= 1
+    cores >=
+    1
   ) {
     return 4.5;
   }
@@ -880,37 +925,43 @@ function ramScore(
     | null,
 ) {
   if (
-    ramGb === null
+    ramGb ===
+    null
   ) {
     return 5.5;
   }
 
   if (
-    ramGb >= 32
+    ramGb >=
+    32
   ) {
     return 10;
   }
 
   if (
-    ramGb >= 16
+    ramGb >=
+    16
   ) {
     return 9;
   }
 
   if (
-    ramGb >= 8
+    ramGb >=
+    8
   ) {
     return 7.8;
   }
 
   if (
-    ramGb >= 4
+    ramGb >=
+    4
   ) {
     return 6;
   }
 
   if (
-    ramGb >= 2
+    ramGb >=
+    2
   ) {
     return 4.5;
   }
@@ -946,10 +997,10 @@ function scoreCpuRam(
       "procesor",
     );
 
-  let technologyBonus =
+  let bonus =
     0;
 
-  const bonuses:
+  const extras:
     string[] = [];
 
   if (
@@ -961,10 +1012,10 @@ function scoreCpuRam(
       ],
     )
   ) {
-    technologyBonus +=
+    bonus +=
       0.3;
 
-    bonuses.push(
+    extras.push(
       "AMD EPYC",
     );
   }
@@ -977,40 +1028,36 @@ function scoreCpuRam(
       ],
     )
   ) {
-    technologyBonus +=
+    bonus +=
       0.2;
 
-    bonuses.push(
+    extras.push(
       "RAM ECC",
     );
   }
 
-  const score =
-    roundScore(
-      cpuScore(
-        cpu.cores,
-      ) *
-        0.55 +
-        ramScore(
-          ramGb,
-        ) *
-          0.45 +
-        technologyBonus,
-    );
-
   return {
-    score,
+    score:
+      roundScore(
+        cpuScore(
+          cpu.cores,
+        ) *
+          0.55 +
+          ramScore(
+            ramGb,
+          ) *
+            0.45 +
+          bonus,
+      ),
 
     note:
-      `Wykryte zasoby: CPU ${cpu.raw || "brak jednoznacznych danych"}, ` +
-      `RAM ${ramRaw || "brak jednoznacznych danych"}. ` +
+      `CPU: ${cpu.raw || "brak danych"}, RAM: ${ramRaw || "brak danych"}. ` +
       (
-        bonuses.length >
-        0
-          ? `Dodatkowo uwzględniono: ${bonuses.join(
+        extras.length
+          ? `Uwzględniono dodatkowo: ${extras.join(
               ", ",
             )}.`
-          : "Nie zastosowano dodatkowego bonusu technologicznego."
+          : ""
       ),
   };
 }
@@ -1020,42 +1067,48 @@ function scoreCpuRam(
 ========================================================= */
 
 function diskScore(
-  diskGb:
+  gb:
     number
     | null,
 ) {
   if (
-    diskGb === null
+    gb ===
+    null
   ) {
     return 6;
   }
 
   if (
-    diskGb >= 400
+    gb >=
+    400
   ) {
     return 10;
   }
 
   if (
-    diskGb >= 200
+    gb >=
+    200
   ) {
     return 9;
   }
 
   if (
-    diskGb >= 100
+    gb >=
+    100
   ) {
     return 8;
   }
 
   if (
-    diskGb >= 50
+    gb >=
+    50
   ) {
     return 6.8;
   }
 
   if (
-    diskGb >= 25
+    gb >=
+    25
   ) {
     return 5.5;
   }
@@ -1064,67 +1117,64 @@ function diskScore(
 }
 
 function transferScore(
-  transferRaw:
+  raw:
     string,
 ) {
-  if (!transferRaw) {
-    /*
-     * Brak informacji nie oznacza
-     * braku transferu.
-     */
+  if (!raw) {
     return 6;
   }
 
-  const normalized =
+  const text =
     normalizeText(
-      transferRaw,
+      raw,
     );
 
   if (
-    normalized.includes(
+    text.includes(
       "bez limitu",
     ) ||
-    normalized.includes(
+    text.includes(
       "unlimited",
     )
   ) {
     return 10;
   }
 
-  const transferGb =
+  const gb =
     parseCapacityGb(
-      transferRaw,
+      raw,
     );
 
   if (
-    transferGb === null
+    gb ===
+    null
   ) {
     return 6;
   }
 
   if (
-    transferGb >=
+    gb >=
     20 * 1024
   ) {
     return 10;
   }
 
   if (
-    transferGb >=
+    gb >=
     10 * 1024
   ) {
     return 9;
   }
 
   if (
-    transferGb >=
+    gb >=
     5 * 1024
   ) {
     return 8;
   }
 
   if (
-    transferGb >=
+    gb >=
     1024
   ) {
     return 6.5;
@@ -1207,29 +1257,26 @@ function scoreDiskTransfer(
     );
   }
 
-  const score =
-    roundScore(
-      diskScore(
-        diskGb,
-      ) *
-        0.55 +
-        transferScore(
-          transferRaw,
-        ) *
-          0.45 +
-        bonus,
-    );
-
   return {
-    score,
+    score:
+      roundScore(
+        diskScore(
+          diskGb,
+        ) *
+          0.55 +
+          transferScore(
+            transferRaw,
+          ) *
+            0.45 +
+          bonus,
+      ),
 
     note:
       `Dysk: ${diskRaw || "brak jednoznacznej pojemności"}. ` +
-      `Transfer: ${transferRaw || "brak opublikowanej wartości — zastosowano ocenę neutralną"}. ` +
+      `Transfer: ${transferRaw || "brak opublikowanej wartości — ocena neutralna"}. ` +
       (
-        extras.length >
-        0
-          ? `Uwzględnione cechy dodatkowe: ${extras.join(
+        extras.length
+          ? `Dodatkowo: ${extras.join(
               ", ",
             )}.`
           : ""
@@ -1242,19 +1289,20 @@ function scoreDiskTransfer(
 ========================================================= */
 
 function backupRetentionDays(
-  raw: string,
+  raw:
+    string,
 ) {
   if (!raw) {
     return null;
   }
 
-  const normalized =
+  const text =
     normalizeText(
       raw,
     );
 
   const hours =
-    normalized.match(
+    text.match(
       /([0-9]+)\s*(?:godzin|godziny|godz|h)/,
     );
 
@@ -1268,7 +1316,7 @@ function backupRetentionDays(
   }
 
   const days =
-    normalized.match(
+    text.match(
       /([0-9]+)\s*dni/,
     );
 
@@ -1281,48 +1329,100 @@ function backupRetentionDays(
   return null;
 }
 
-function backupScore(
+function includedBackupScore(
   days:
     number
     | null,
 ) {
   if (
-    days === null
+    days ===
+    null
   ) {
     return 5;
   }
 
   if (
-    days >= 30
+    days >=
+    30
   ) {
     return 10;
   }
 
   if (
-    days >= 14
+    days >=
+    14
   ) {
     return 9;
   }
 
   if (
-    days >= 7
+    days >=
+    7
   ) {
     return 8;
   }
 
   if (
-    days >= 3
+    days >=
+    3
   ) {
     return 6.5;
   }
 
   if (
-    days >= 1
+    days >=
+    1
   ) {
     return 5.5;
   }
 
   return 4;
+}
+
+function backupComponentScore(
+  raw:
+    string,
+) {
+  if (!raw) {
+    return 5;
+  }
+
+  if (
+    explicitlyUnavailable(
+      raw,
+    )
+  ) {
+    return 2.5;
+  }
+
+  const retention =
+    backupRetentionDays(
+      raw,
+    );
+
+  const base =
+    includedBackupScore(
+      retention,
+    );
+
+  /*
+   * Backup dostępny jako płatny
+   * dodatek ma wartość, ale nie
+   * może być oceniony tak samo
+   * jak kopie zawarte w cenie.
+   */
+  if (
+    isOptionalPaid(
+      raw,
+    )
+  ) {
+    return Math.min(
+      6,
+      base - 2,
+    );
+  }
+
+  return base;
 }
 
 function slaScore(
@@ -1331,37 +1431,43 @@ function slaScore(
     | null,
 ) {
   if (
-    sla === null
+    sla ===
+    null
   ) {
     return 5.5;
   }
 
   if (
-    sla >= 99.99
+    sla >=
+    99.99
   ) {
     return 10;
   }
 
   if (
-    sla >= 99.95
+    sla >=
+    99.95
   ) {
     return 9.5;
   }
 
   if (
-    sla >= 99.9
+    sla >=
+    99.9
   ) {
     return 9;
   }
 
   if (
-    sla >= 99.5
+    sla >=
+    99.5
   ) {
     return 7;
   }
 
   if (
-    sla >= 99
+    sla >=
+    99
   ) {
     return 5.5;
   }
@@ -1387,8 +1493,8 @@ function scoreBackupReliability(
       "sla",
     );
 
-  const retention =
-    backupRetentionDays(
+  const backupScore =
+    backupComponentScore(
       backupRaw,
     );
 
@@ -1397,25 +1503,30 @@ function scoreBackupReliability(
       slaRaw,
     );
 
-  const score =
-    roundScore(
-      backupScore(
-        retention,
-      ) *
-        0.6 +
-        slaScore(
-          sla,
-        ) *
-          0.4,
+  const optional =
+    isOptionalPaid(
+      backupRaw,
     );
 
   return {
-    score,
+    score:
+      roundScore(
+        backupScore *
+          0.6 +
+          slaScore(
+            sla,
+          ) *
+            0.4,
+      ),
 
     note:
       `Backup: ${backupRaw || "brak jednoznacznych danych"}. ` +
-      `SLA: ${slaRaw || "brak jednoznacznych danych"}. ` +
-      `Backup odpowiada za 60% oceny kryterium, a deklarowane SLA za 40%.`,
+      `SLA: ${slaRaw || "brak danych"}. ` +
+      (
+        optional
+          ? "Backup jest opcjonalnym płatnym dodatkiem, dlatego nie otrzymuje punktacji jak backup zawarty w cenie."
+          : "Backup odpowiada za 60% oceny kryterium, a SLA za 40%."
+      ),
   };
 }
 
@@ -1437,7 +1548,7 @@ function scoreSecurity(
   const detected:
     string[] = [];
 
-  const hasDdos =
+  if (
     featureEnabled(
       features,
       "ochrona_ddos",
@@ -1450,9 +1561,17 @@ function scoreSecurity(
         "anti-ddos",
         "antyddos",
       ],
-    );
+    )
+  ) {
+    score +=
+      2;
 
-  const hasBruteforce =
+    detected.push(
+      "ochrona DDoS",
+    );
+  }
+
+  if (
     featureEnabled(
       features,
       "ochrona_bruteforce",
@@ -1464,9 +1583,17 @@ function scoreSecurity(
         "anty-bruteforce",
         "brute force",
       ],
-    );
+    )
+  ) {
+    score +=
+      1;
 
-  const hasKvm =
+    detected.push(
+      "ochrona BruteForce",
+    );
+  }
+
+  if (
     containsAny(
       featureText(
         features,
@@ -1481,9 +1608,17 @@ function scoreSecurity(
       [
         "wirtualizacja kvm",
       ],
-    );
+    )
+  ) {
+    score +=
+      1;
 
-  const highAvailability =
+    detected.push(
+      "izolacja KVM",
+    );
+  }
+
+  if (
     featureEnabled(
       features,
       "wysoka_dostepnosc",
@@ -1494,39 +1629,7 @@ function scoreSecurity(
         "wysokiej dostepnosci",
         "high availability",
       ],
-    );
-
-  if (hasDdos) {
-    score +=
-      2;
-
-    detected.push(
-      "ochrona DDoS",
-    );
-  }
-
-  if (
-    hasBruteforce
-  ) {
-    score +=
-      1;
-
-    detected.push(
-      "ochrona BruteForce",
-    );
-  }
-
-  if (hasKvm) {
-    score +=
-      1;
-
-    detected.push(
-      "izolacja KVM",
-    );
-  }
-
-  if (
-    highAvailability
+    )
   ) {
     score +=
       1;
@@ -1543,12 +1646,11 @@ function scoreSecurity(
       ),
 
     note:
-      detected.length >
-      0
-        ? `W zapisanych danych wykryto: ${detected.join(
+      detected.length
+        ? `Wykryto: ${detected.join(
             ", ",
           )}.`
-        : "Nie znaleziono wystarczającej liczby jednoznacznie zapisanych mechanizmów bezpieczeństwa. Zastosowano neutralną wartość bazową.",
+        : "Brak wystarczającej liczby jednoznacznie zapisanych zabezpieczeń. Zastosowano neutralną wartość bazową.",
   };
 }
 
@@ -1578,12 +1680,8 @@ function scoreManagementSupport(
 
   if (
     management &&
-    !containsAny(
+    !explicitlyUnavailable(
       management,
-      [
-        "brak",
-        "nie",
-      ],
     )
   ) {
     score +=
@@ -1648,12 +1746,25 @@ function scoreManagementSupport(
     );
 
   if (panel) {
-    score +=
-      0.5;
+    if (
+      isOptionalPaid(
+        panel,
+      )
+    ) {
+      score +=
+        0.15;
 
-    detected.push(
-      `panel ${panel}`,
-    );
+      detected.push(
+        `panel opcjonalny: ${panel}`,
+      );
+    } else {
+      score +=
+        0.5;
+
+      detected.push(
+        `panel: ${panel}`,
+      );
+    }
   }
 
   if (
@@ -1678,12 +1789,11 @@ function scoreManagementSupport(
       ),
 
     note:
-      detected.length >
-      0
+      detected.length
         ? `Wykryte elementy zarządzania i wsparcia: ${detected.join(
             ", ",
           )}.`
-        : "Brak jednoznacznych informacji o administracji lub dodatkowym wsparciu. Zastosowano neutralną wartość bazową.",
+        : "Brak jednoznacznych informacji o administracji lub dodatkowym wsparciu.",
   };
 }
 
@@ -1789,12 +1899,11 @@ function scoreScalability(
       ),
 
     note:
-      detected.length >
-      0
+      detected.length
         ? `Wykryte mechanizmy skalowania: ${detected.join(
             ", ",
           )}.`
-        : "Brak jednoznacznie zapisanych mechanizmów zwiększania zasobów. Przyznano bazową ocenę skalowalności.",
+        : "Brak jednoznacznie zapisanych mechanizmów zwiększania zasobów.",
   };
 }
 
@@ -1824,20 +1933,15 @@ function scorePlatformFlexibility(
     );
 
   if (systems) {
-    if (
+    score +=
       systems.includes(
         ",",
       ) ||
       systems.includes(
         "/",
       )
-    ) {
-      score +=
-        1.5;
-    } else {
-      score +=
-        0.8;
-    }
+        ? 1.5
+        : 0.8;
 
     detected.push(
       `systemy: ${systems}`,
@@ -1931,11 +2035,25 @@ function scorePlatformFlexibility(
     );
 
   if (panel) {
+    /*
+     * Opcjonalny płatny panel
+     * zwiększa elastyczność,
+     * ale dużo mniej niż panel
+     * zawarty w usłudze.
+     */
     score +=
-      0.5;
+      isOptionalPaid(
+        panel,
+      )
+        ? 0.2
+        : 0.5;
 
     detected.push(
-      `panel: ${panel}`,
+      isOptionalPaid(
+        panel,
+      )
+        ? `panel opcjonalny: ${panel}`
+        : `panel: ${panel}`,
     );
   }
 
@@ -1960,12 +2078,11 @@ function scorePlatformFlexibility(
       ),
 
     note:
-      detected.length >
-      0
+      detected.length
         ? `Wykryte elementy elastyczności platformy: ${detected.join(
             ", ",
           )}.`
-        : "Brak wystarczających danych o możliwościach konfiguracji platformy. Zastosowano neutralną ocenę bazową.",
+        : "Brak wystarczających danych o możliwościach konfiguracji platformy.",
   };
 }
 
@@ -2053,14 +2170,15 @@ function calculateCriterion(
 }
 
 function assertSupportedCategory(
-  slug: string,
+  slug:
+    string,
 ) {
   if (
     slug !==
     SUPPORTED_CATEGORY_SLUG
   ) {
     throw new Error(
-      "Ten profil automatycznego scoringu obsługuje wyłącznie kategorię VPS i Cloud Server.",
+      "Ten profil scoringu obsługuje wyłącznie VPS i Cloud Server.",
     );
   }
 }
@@ -2069,13 +2187,20 @@ function assertCriteriaSupported(
   criteria:
     RatingCriterionInput[],
 ) {
+  const active =
+    criteria.filter(
+      (
+        criterion,
+      ) =>
+        criterion.isPublished,
+    );
+
   const unsupported =
-    criteria
+    active
       .filter(
         (
           criterion,
         ) =>
-          criterion.isPublished &&
           !SUPPORTED_CRITERIA.has(
             criterion.key,
           ),
@@ -2088,8 +2213,7 @@ function assertCriteriaSupported(
       );
 
   if (
-    unsupported.length >
-    0
+    unsupported.length
   ) {
     throw new Error(
       `Brak reguł VPS/Cloud dla kryteriów: ${unsupported.join(
@@ -2100,19 +2224,12 @@ function assertCriteriaSupported(
 
   const activeKeys =
     new Set(
-      criteria
-        .filter(
-          (
-            criterion,
-          ) =>
-            criterion.isPublished,
-        )
-        .map(
-          (
-            criterion,
-          ) =>
-            criterion.key,
-        ),
+      active.map(
+        (
+          criterion,
+        ) =>
+          criterion.key,
+      ),
     );
 
   const missing =
@@ -2128,8 +2245,7 @@ function assertCriteriaSupported(
     );
 
   if (
-    missing.length >
-    0
+    missing.length
   ) {
     throw new Error(
       `Brakuje opublikowanych kryteriów VPS/Cloud: ${missing.join(
@@ -2186,10 +2302,6 @@ async function rateLoadedOffer(
         criterion.id,
       );
 
-    /*
-     * Ręczny override ma zawsze
-     * pierwszeństwo.
-     */
     if (
       current &&
       !isAutomaticRatingNote(
